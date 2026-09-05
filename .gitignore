@@ -1,0 +1,14 @@
+# Go binaries
+*.exe
+
+# Environment variables
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
