@@ -2,29 +2,23 @@ package main
 
 import "fmt"
 
-type Address struct {
-	City    string
-	Country string
-}
-
 type Student struct {
-	ID      int
-	Name    string
-	Age     int
-	Email   string
-	Address Address
+	ID    int
+	Name  string
+	Age   int
+	Email string
 }
 
-func introduce(student Student) {
-	fmt.Println("My name is", student.Name)
-}
+func updateStudent(student *Student, name string, age int) {
+	if student == nil {
+		fmt.Println("Student not found")
+		return
+	}
 
-func (s Student) introduce() {
-	fmt.Println("My name is:", s.Name)
-}
+	student.Name = name
+	student.Age = age
 
-func (s *Student) updateAge(age int) {
-	s.Age = age
+	fmt.Println("Student updated successfully")
 }
 
 func main() {
@@ -33,16 +27,20 @@ func main() {
 		Name:  "Ahmed",
 		Age:   25,
 		Email: "ahmed@gmail.com",
-		Address: Address{
-			City:    "Mogadishu",
-			Country: "Somalia",
-		},
 	}
 
-	introduce(student)
-	student.introduce()
+	fmt.Println("Before:")
+	fmt.Println("Name:", student.Name)
+	fmt.Println("Age:", student.Age)
 
-	student.updateAge(26)
+	updateStudent(&student, "Mohamed", 22)
 
-	fmt.Println("Student Age:", student.Age)
+	fmt.Println()
+	fmt.Println("After:")
+	fmt.Println("Name:", student.Name)
+	fmt.Println("Age:", student.Age)
+
+	fmt.Println()
+
+	updateStudent(nil, "Ali", 20)
 }
