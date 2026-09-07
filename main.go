@@ -3,44 +3,33 @@ package main
 import "fmt"
 
 type Student struct {
-	ID    int
-	Name  string
-	Age   int
-	Email string
-}
-
-func updateStudent(student *Student, name string, age int) {
-	if student == nil {
-		fmt.Println("Student not found")
-		return
-	}
-
-	student.Name = name
-	student.Age = age
-
-	fmt.Println("Student updated successfully")
+	ID   int
+	Name string
+	Age  int
 }
 
 func main() {
-	student := Student{
-		ID:    1001,
-		Name:  "Ahmed",
-		Age:   25,
-		Email: "ahmed@gmail.com",
-	}
+	ch := make(chan Student)
 
-	fmt.Println("Before:")
-	fmt.Println("Name:", student.Name)
-	fmt.Println("Age:", student.Age)
+	go func() {
+		ch <- Student{
+			ID:   1001,
+			Name: "Muscab",
+			Age:  20,
+		}
+	}()
 
-	updateStudent(&student, "Mohamed", 22)
+	go func() {
+		ch <- Student{
+			ID:   2002,
+			Name: "Ali",
+			Age:  43,
+		}
+	}()
 
-	fmt.Println()
-	fmt.Println("After:")
-	fmt.Println("Name:", student.Name)
-	fmt.Println("Age:", student.Age)
+	students1 := <-ch
+	students2 := <-ch
 
-	fmt.Println()
-
-	updateStudent(nil, "Ali", 20)
+	fmt.Println("Name 1:", students1.Name)
+	fmt.Println("Name 2:", students2.Name)
 }

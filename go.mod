@@ -1,3 +1,3 @@
-module student-management-api
+module EduCore
 
 go 1.27.0
