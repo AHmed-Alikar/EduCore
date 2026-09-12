@@ -42,9 +42,9 @@ EduCore/
    cd EduCore
    go mod download
    ```
-2. Create a `.env` file in the project root:
-   ```
-   DATABASE_URL=postgres://user:password@localhost:5432/educore?sslmode=disable
+2. Copy `.env.example` to `.env` and fill in real values — a database URL and a JWT signing secret (`openssl rand -base64 32` generates a reasonable one):
+   ```bash
+   cp .env.example .env
    ```
 3. Create the tables the API expects:
    ```sql
@@ -84,7 +84,6 @@ Ordered by what's actually planned next, not by ambition:
 
 - [ ] Wire up full student CRUD to HTTP (create/update/delete currently exist as internal functions only, not exposed as routes)
 - [ ] Teachers, courses, attendance, and grades — the rest of the domain model
-- [ ] Move the JWT signing secret out of source code and into environment configuration
 - [ ] Input validation on `/register` and `/login`
 - [ ] Automated tests (currently none)
 - [ ] React frontend
@@ -92,9 +91,9 @@ Ordered by what's actually planned next, not by ambition:
 
 ## Known limitations
 
-- The JWT secret is currently hardcoded in `token.go`. It needs to move to an environment variable before this is ever run anywhere but locally.
 - `createStudent`, `updateStudent`, and `deleteStudent` exist in `main.go` but aren't wired to HTTP routes yet — today only reads are exposed.
 - No automated tests yet.
+- No input validation on `/register` or `/login` beyond what the database schema enforces (e.g. `email` uniqueness).
 
 ## License
 
