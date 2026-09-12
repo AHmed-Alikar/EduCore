@@ -1,105 +1,175 @@
-func studentHandler(w http.ResponseWriter, r *http.Request) {
+package main
 
-	parts := strings.Split(r.URL.Path, "/")
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
 
-	// /students
-	if len(parts) == 2 {
+	"github.com/jackc/pgx/v5"
+)
 
-		switch r.Method {
+type Student struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+	Age  int    `json:"age"`
+}
 
-		case http.MethodGet:
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(students)
+func getStudent(conn *pgx.Conn) {
 
-		case http.MethodPost:
-			var student Student
+	var id int
+	var name string
+	var age int
 
-			err := json.NewDecoder(r.Body).Decode(&student)
-
-			if err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				fmt.Fprintln(w, "Invalid JSON")
-				return
-			}
-
-			student.ID = 1003
-			students[student.ID] = student
-
-			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(student)
-
-		default:
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprintln(w, "Method Not Allowed")
-		}
-
-		return
-	}
-
-	// /students/{id}
-	id, err := strconv.Atoi(parts[2])
+	err := conn.QueryRow(
+		context.Background(),
+		"SELECT id, name, age FROM students WHERE id = $1",
+		1001,
+	).Scan(&id, &name, &age)
 
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintln(w, "Invalid Student ID")
+		fmt.Println("Failed to get student:", err)
 		return
 	}
 
-	switch r.Method {
+	fmt.Println("ID:", id)
+	fmt.Println("Name:", name)
+	fmt.Println("Age:", age)
+}
 
-	case http.MethodGet:
-		student, exists := students[id]
+func createStudent(conn *pgx.Conn) {
+	_, err := conn.Exec(
+		context.Background(),
+		"INSERT INTO students (id, name, age) VALUES ($1, $2, $3)",
+		1002,
+		"Ali",
+		43,
+	)
 
-		if !exists {
-			w.WriteHeader(http.StatusNotFound)
-			fmt.Fprintln(w, "Student not found")
-			return
-		}
+	if err != nil {
+		fmt.Println("Failed to create student:", err)
+		return
+	}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(student)
+	fmt.Println("Student created successfully")
+}
 
-	case http.MethodPut:
-		var student Student
+func getStudents(conn *pgx.Conn) {
+	rows, err := conn.Query(
+		context.Background(),
+		"SELECT id, name, age FROM students",
+	)
 
-		err := json.NewDecoder(r.Body).Decode(&student)
+	if err != nil {
+		fmt.Println("Failed to get students:", err)
+		return
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int
+		var name string
+		var age int
+
+		err := rows.Scan(&id, &name, &age)
 
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintln(w, "Invalid JSON")
+			fmt.Println("Failed to scan student:", err)
 			return
 		}
 
-		_, exists := students[id]
+		fmt.Println("ID:", id)
+		fmt.Println("Name:", name)
+		fmt.Println("Age:", age)
+		fmt.Println("---")
+	}
+}
 
-		if !exists {
-			w.WriteHeader(http.StatusNotFound)
-			fmt.Fprintln(w, "Student not found")
+func updateStudent(conn *pgx.Conn) {
+	_, err := conn.Exec(
+		context.Background(),
+		"UPDATE students SET age = $1 WHERE id = $2",
+		27,
+		1001,
+	)
+
+	if err != nil {
+		fmt.Println("Failed to update student:", err)
+		return
+	}
+
+	fmt.Println("Student updated successfully")
+}
+
+func deleteStudent(conn *pgx.Conn) {
+	_, err := conn.Exec(
+		context.Background(),
+		"DELETE FROM students WHERE id = $1",
+		1002,
+	)
+
+	if err != nil {
+		fmt.Print("Failed to delete Database: ", err)
+		return
+	}
+
+	fmt.Println("Student deleted successfully")
+}
+
+func getStudentsHandler(w http.ResponseWriter, r *http.Request) {
+	conn, err := connectDB()
+
+	if err != nil {
+		http.Error(w, "Database connection failed", http.StatusInternalServerError)
+		return
+	}
+
+	defer conn.Close(context.Background())
+
+	rows, err := conn.Query(
+		context.Background(),
+		"SELECT id, name, age FROM students",
+	)
+
+	if err != nil {
+		http.Error(w, "Failed to get students", http.StatusInternalServerError)
+		return
+	}
+
+	defer rows.Close()
+
+	var students []Student
+
+	for rows.Next() {
+		var student Student
+
+		err := rows.Scan(
+			&student.ID,
+			&student.Name,
+			&student.Age,
+		)
+
+		if err != nil {
+			http.Error(w, "Failed to scan student", http.StatusInternalServerError)
 			return
 		}
 
-		student.ID = id
-		students[id] = student
+		students = append(students, student)
+	}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(student)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(students)
+}
 
-	case http.MethodDelete:
-		_, exists := students[id]
+func main() {
+	http.HandleFunc("/students", getStudentsHandler)
 
-		if !exists {
-			w.WriteHeader(http.StatusNotFound)
-			fmt.Fprintln(w, "Student not found")
-			return
-		}
+	fmt.Println("EduCore server running on http://localhost:8080")
 
-		delete(students, id)
+	err := http.ListenAndServe(":8080", nil)
 
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "Student deleted successfully")
-
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		fmt.Fprintln(w, "Method Not Allowed")
+	if err != nil {
+		fmt.Println("Server failed:", err)
 	}
 }
