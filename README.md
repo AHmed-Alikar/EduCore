@@ -78,6 +78,16 @@ EduCore/
 | GET | `/profile` | Bearer token | Any authenticated user |
 | GET | `/admin` | Bearer token, `admin` role | Role-gated example route |
 
+## Testing
+
+Password hashing/verification is covered in `auth_test.go`. Because
+`token.go`'s `init()` requires `JWT_SECRET` to be set (see
+[Known limitations](#known-limitations)), tests need it too:
+
+```bash
+JWT_SECRET=any-value-for-tests go test ./...
+```
+
 ## Roadmap
 
 Ordered by what's actually planned next, not by ambition:
@@ -85,14 +95,14 @@ Ordered by what's actually planned next, not by ambition:
 - [ ] Wire up full student CRUD to HTTP (create/update/delete currently exist as internal functions only, not exposed as routes)
 - [ ] Teachers, courses, attendance, and grades — the rest of the domain model
 - [ ] Input validation on `/register` and `/login`
-- [ ] Automated tests (currently none)
+- [ ] Automated tests for HTTP handlers and the database layer (currently only password hashing is covered)
 - [ ] React frontend
 - [ ] CI (lint + test on PR)
 
 ## Known limitations
 
 - `createStudent`, `updateStudent`, and `deleteStudent` exist in `main.go` but aren't wired to HTTP routes yet — today only reads are exposed.
-- No automated tests yet.
+- Test coverage is limited to password hashing (`auth_test.go`) — the HTTP handlers and database layer aren't tested yet.
 - No input validation on `/register` or `/login` beyond what the database schema enforces (e.g. `email` uniqueness).
 
 ## License
