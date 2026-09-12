@@ -15,6 +15,14 @@ type Student struct {
 	Age  int    `json:"age"`
 }
 
+type User struct {
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	Email        string `json:"email"`
+	PasswordHash string `json:"-"`
+	Role         string `json:"role"`
+}
+
 func getStudent(conn *pgx.Conn) {
 
 	var id int
@@ -162,11 +170,142 @@ func getStudentsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(students)
 }
 
+func registerHandler(w http.ResponseWriter, r *http.Request) {
+	conn, err := connectDB()
+
+	if err != nil {
+		http.Error(w, "Database connection failed", http.StatusInternalServerError)
+		return
+	}
+	defer conn.Close(context.Background())
+
+	var input struct {
+		Name     string `json:"name"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		Role     string `json:"role"`
+	}
+
+	err = json.NewDecoder(r.Body).Decode(&input)
+	if err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	hash, err := hashPassword(input.Password)
+	if err != nil {
+		http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+		return
+	}
+
+	var user User
+	err = conn.QueryRow(
+		context.Background(),
+		`INSERT INTO users (name, email, password_hash, role)
+	 VALUES ($1, $2, $3, $4)
+	 RETURNING id, name, email, role`,
+		input.Name,
+		input.Email,
+		hash,
+		"student",
+	).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.Role,
+	)
+
+	if err != nil {
+		http.Error(w, "Failed to create user", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	conn, err := connectDB()
+
+	if err != nil {
+		http.Error(w, "Database connection failed", http.StatusInternalServerError)
+		return
+	}
+
+	defer conn.Close(context.Background())
+
+	var input struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	err = json.NewDecoder(r.Body).Decode(&input)
+
+	if err != nil {
+		http.Error(w, "Invalid Json", http.StatusBadRequest)
+		return
+	}
+
+	var user User
+
+	err = conn.QueryRow(
+		context.Background(),
+		"SELECT id, name, email, password_hash FROM users WHERE email = $1",
+		input.Email,
+	).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.PasswordHash,
+	)
+
+	if err != nil {
+		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	if !checkPassword(input.Password, user.PasswordHash) {
+		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	token, err := createToken(user)
+
+	if err != nil {
+		http.Error(w, "Failed to create token", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"user":  user,
+		"token": token,
+	})
+}
+
+func profileHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "Welcome to your profile")
+}
+
+func adminHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "Welcome Admin")
+}
 func main() {
 	http.HandleFunc("/students", getStudentsHandler)
-
+	http.HandleFunc("/register", registerHandler)
+	http.HandleFunc("/login", loginHandler)
+	http.Handle("/profile", authMiddleware(http.HandlerFunc(profileHandler)))
 	fmt.Println("EduCore server running on http://localhost:8080")
-
+	http.Handle(
+		"/admin",
+		authMiddleware(
+			requireRole(
+				"admin",
+				http.HandlerFunc(adminHandler),
+			),
+		),
+	)
 	err := http.ListenAndServe(":8080", nil)
 
 	if err != nil {
